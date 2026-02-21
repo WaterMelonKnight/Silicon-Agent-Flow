@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: silicon-agent-flow
+
+  main:
+    allow-circular-references: true
+
+  datasource:
+    url: jdbc:h2:mem:edadb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.silicon.agentflow: DEBUG
+    org.hibernate.SQL: DEBUG
+
+# OpenROAD 配置
+openroad:
+  docker:
+    enabled: false  # 设置为 true 启用 Docker 执行
+    image: openroad/flow-ubuntu22.04
+  timeout:
+    minutes: 30
+
+# AI 优化配置
+ai:
+  optimization:
+    enabled: true
+    max-iterations: 10  # 最大优化迭代次数
+    model: gpt-4  # 或使用 deepseek-chat
+  openai:
+    api-key: ${OPENAI_API_KEY:sk-your-api-key}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}  # 可替换为 DeepSeek 或本地 API
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+
+  datasource:
+    url: jdbc:mysql://mysql:3306/edadb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: rootpassword
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
