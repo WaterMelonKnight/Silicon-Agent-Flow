@@ -20,6 +20,8 @@ import java.util.Map;
 @Service
 public class OpenRoadService {
 
+    private final OrfsExecutorService orfsExecutorService;
+
     @Value("${openroad.docker.image:openroad/flow-ubuntu22.04}")
     private String dockerImage;
 
@@ -28,6 +30,13 @@ public class OpenRoadService {
 
     @Value("${openroad.timeout.minutes:30}")
     private long timeoutMinutes;
+
+    @Value("${eda.orfs.docker.enabled:true}")
+    private boolean orfsEnabled;
+
+    public OpenRoadService(OrfsExecutorService orfsExecutorService) {
+        this.orfsExecutorService = orfsExecutorService;
+    }
 
     /**
      * 执行结果
@@ -73,6 +82,35 @@ public class OpenRoadService {
         log.info("Starting OpenROAD execution for job {}", jobId);
 
         try {
+            // 优先使用 ORFS 执行器（真实的 OpenROAD Flow Scripts）
+            if (orfsEnabled) {
+                log.info("Using ORFS executor for job {}", jobId);
+                OrfsExecutorService.OrfsExecutionResult orfsResult =
+                    orfsExecutorService.executeJob(jobId, parameters);
+
+                // 读取日志文件内容
+                String logContent = "";
+                if (orfsResult.getLogFilePath() != null) {
+                    try {
+                        logContent = java.nio.file.Files.readString(
+                            java.nio.file.Paths.get(orfsResult.getLogFilePath()));
+                    } catch (Exception e) {
+                        log.warn("Failed to read log file: {}", orfsResult.getLogFilePath(), e);
+                        logContent = "Log file: " + orfsResult.getLogFilePath();
+                    }
+                }
+
+                return new ExecutionResult(
+                    orfsResult.isSuccess(),
+                    logContent,
+                    orfsResult.getMetrics(),
+                    orfsResult.getErrorMessage()
+                );
+            }
+
+            // 回退到原有的 TCL 执行方式
+            log.info("Using legacy TCL executor for job {}", jobId);
+
             // 1. 生成 TCL 配置文件
             Path tclFile = TclTemplateGenerator.generateTclConfig(jobId, parameters);
             log.info("Generated TCL config: {}", tclFile.toAbsolutePath());
@@ -108,9 +146,6 @@ public class OpenRoadService {
         } catch (Exception e) {
             log.error("Failed to execute OpenROAD for job {}", jobId, e);
             return new ExecutionResult(false, "", Map.of(), "Exception: " + e.getMessage());
-        } finally {
-            // 清理工作目录（可选）
-            // TclTemplateGenerator.cleanupWorkDir(jobId);
         }
     }
 

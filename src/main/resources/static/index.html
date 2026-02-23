@@ -263,35 +263,43 @@
             <div class="left-panel">
                 <div class="panel-title neon-cyan">⚡ CONTROL PANEL</div>
 
+                <!-- ORFS Configuration Check -->
+                <div v-if="orfsConfig" style="margin-bottom: 15px; padding: 10px; background: #1a1a2e; border-left: 3px solid" :style="{ borderLeftColor: orfsConfig.workspace_valid && orfsConfig.docker_available ? '#00ff00' : '#ff0000' }">
+                    <div style="font-size: 11px; color: #888; margin-bottom: 5px;">ORFS STATUS</div>
+                    <div style="font-size: 10px;">
+                        <div :style="{ color: orfsConfig.docker_available ? '#00ff00' : '#ff0000' }">
+                            {{ orfsConfig.docker_available ? '✓' : '✗' }} Docker: {{ orfsConfig.docker_available ? 'OK' : 'UNAVAILABLE' }}
+                        </div>
+                        <div :style="{ color: orfsConfig.workspace_valid ? '#00ff00' : '#ff0000' }">
+                            {{ orfsConfig.workspace_valid ? '✓' : '✗' }} Workspace: {{ orfsConfig.workspace_valid ? 'OK' : 'INVALID' }}
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Parameter Form -->
                 <div class="form-group">
-                    <label class="form-label">DESIGN NAME</label>
-                    <input type="text" class="form-input" v-model="params.design_name">
+                    <label class="form-label">DESIGN CONFIG</label>
+                    <select class="form-input" v-model="params.design_config">
+                        <option value="designs/sky130hd/gcd/config.mk">GCD (Greatest Common Divisor)</option>
+                        <option value="designs/sky130hd/aes/config.mk">AES (Advanced Encryption)</option>
+                        <option value="designs/sky130hd/ibex/config.mk">IBEX (RISC-V Core)</option>
+                        <option value="designs/sky130hd/jpeg/config.mk">JPEG Encoder</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">TECHNOLOGY</label>
-                    <input type="text" class="form-input" v-model="params.technology">
+                    <label class="form-label">CORE UTILIZATION (%)</label>
+                    <input type="number" class="form-input" v-model.number="params.CORE_UTILIZATION" step="5" min="10" max="90">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">CORE UTILIZATION</label>
-                    <input type="number" class="form-input" v-model.number="params.utilization" step="0.1" min="0" max="100">
+                    <label class="form-label">PLACE DENSITY</label>
+                    <input type="number" class="form-input" v-model.number="params.PLACE_DENSITY" step="0.05" min="0.1" max="1.0">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">ASPECT RATIO</label>
-                    <input type="number" class="form-input" v-model.number="params.aspect_ratio" step="0.1" min="0.1">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">TARGET FREQUENCY (MHz)</label>
-                    <input type="number" class="form-input" v-model.number="params.target_frequency">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">POWER BUDGET (mW)</label>
-                    <input type="number" class="form-input" v-model.number="params.power_budget">
+                    <label class="form-label">CORE ASPECT RATIO</label>
+                    <input type="number" class="form-input" v-model.number="params.CORE_ASPECT_RATIO" step="0.1" min="0.5" max="2.0">
                 </div>
 
                 <div class="form-group" style="margin-top: 20px;">
@@ -314,8 +322,20 @@
                     <div v-for="job in jobs.slice(0, 5)" :key="job.id" class="job-item" @click="viewJobLog(job)">
                         <span class="job-id">#{{ job.id }}</span>
                         <span class="job-status" :class="'status-' + job.status">{{ job.status }}</span>
-                        <div style="margin-top: 5px; color: #888;">
+                        <div style="margin-top: 5px; color: #888; font-size: 10px;">
                             {{ formatTime(job.createdAt) }}
+                        </div>
+                        <!-- AI Optimization Info -->
+                        <div v-if="job.autoOptimize" style="margin-top: 3px; color: #00ffff; font-size: 10px;">
+                            🤖 AI Opt: Iter {{ job.optimizationIteration }}
+                            <span v-if="job.parentJobId" style="color: #ff00ff;"> ← #{{ job.parentJobId }}</span>
+                        </div>
+                        <!-- Result Metrics -->
+                        <div v-if="job.resultMetrics && job.status === 'COMPLETED'" style="margin-top: 3px; font-size: 9px;">
+                            <span style="color: #00ff00;">Area: {{ job.resultMetrics.area_um2?.toFixed(1) }} μm²</span>
+                            <span v-if="job.resultMetrics.slack_ns" :style="{ color: job.resultMetrics.timing_met ? '#00ff00' : '#ff6666', marginLeft: '5px' }">
+                                Slack: {{ job.resultMetrics.slack_ns?.toFixed(2) }} ns
+                            </span>
                         </div>
                         <div v-if="job.errorMessage" style="margin-top: 3px; color: #ff6666; font-size: 10px;">
                             ⚠ {{ job.errorMessage.substring(0, 40) }}...
@@ -339,6 +359,10 @@
                     <div class="stat-card">
                         <div class="stat-value">{{ completedCount }}</div>
                         <div class="stat-label">Completed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{{ aiOptimizedCount }}</div>
+                        <div class="stat-label">AI Optimized</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">{{ failedCount }}</div>
@@ -375,19 +399,17 @@
                 return {
                     currentTime: '',
                     params: {
-                        design_name: 'cyberpunk_chip',
-                        technology: '28nm',
-                        utilization: 70.0,
-                        aspect_ratio: 1.0,
-                        core_margin: 2.0,
-                        target_frequency: 1200.0,
-                        power_budget: 150.0
+                        design_config: 'designs/sky130hd/gcd/config.mk',
+                        CORE_UTILIZATION: 65,
+                        PLACE_DENSITY: 0.70,
+                        CORE_ASPECT_RATIO: 1.0
                     },
-                    autoOptimize: true,
+                    autoOptimize: false,
                     submitting: false,
                     jobs: [],
                     terminalLogs: [],
-                    chart: null
+                    chart: null,
+                    orfsConfig: null
                 };
             },
             computed: {
@@ -396,6 +418,9 @@
                 },
                 completedCount() {
                     return this.jobs.filter(j => j.status === 'COMPLETED').length;
+                },
+                aiOptimizedCount() {
+                    return this.jobs.filter(j => j.autoOptimize === true).length;
                 },
                 failedCount() {
                     return this.jobs.filter(j => j.status === 'FAILED').length;
@@ -407,9 +432,11 @@
 
                 this.initChart();
                 this.fetchJobs();
+                this.fetchOrfsConfig();
                 setInterval(this.fetchJobs, 3000);
 
                 this.addLog('System initialized', 'terminal-success');
+                this.addLog('ORFS Real-time execution enabled', 'terminal-success');
                 this.addLog('Waiting for mission commands...', 'terminal-line');
             },
             methods: {
@@ -420,7 +447,8 @@
 
                 async submitJob() {
                     this.submitting = true;
-                    this.addLog(`Launching mission: ${this.params.design_name}`, 'terminal-line');
+                    const designName = this.params.design_config.split('/').pop().replace('.mk', '');
+                    this.addLog(`Launching ORFS mission: ${designName}`, 'terminal-line');
 
                     try {
                         const response = await fetch('/api/jobs', {
@@ -436,11 +464,29 @@
 
                         const job = await response.json();
                         this.addLog(`✓ Mission #${job.id} launched successfully`, 'terminal-success');
+                        this.addLog(`Design: ${designName}, Status: ${job.status}`, 'terminal-line');
                         this.fetchJobs();
                     } catch (error) {
                         this.addLog(`✗ ERROR: ${error.message}`, 'terminal-error');
                     } finally {
                         this.submitting = false;
+                    }
+                },
+
+                async fetchOrfsConfig() {
+                    try {
+                        const response = await fetch('/api/jobs/orfs/config');
+                        if (response.ok) {
+                            this.orfsConfig = await response.json();
+                            if (this.orfsConfig.docker_available && this.orfsConfig.workspace_valid) {
+                                this.addLog('✓ ORFS configuration validated', 'terminal-success');
+                            } else {
+                                this.addLog('⚠ ORFS configuration issues detected', 'terminal-error');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch ORFS config:', error);
+                        this.addLog('✗ Failed to check ORFS configuration', 'terminal-error');
                     }
                 },
 

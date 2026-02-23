@@ -4,6 +4,7 @@ import com.silicon.agentflow.dto.JobResponse;
 import com.silicon.agentflow.dto.JobSubmitRequest;
 import com.silicon.agentflow.entity.EdaJob;
 import com.silicon.agentflow.service.EdaJobService;
+import com.silicon.agentflow.service.OrfsExecutorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Tag(name = "EDA Jobs", description = "EDA job management APIs")
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class EdaJobController {
 
     private final EdaJobService edaJobService;
+    private final OrfsExecutorService orfsExecutorService;
 
     @Operation(summary = "Submit a new EDA job", description = "Submit a new chip design job with optional AI auto-optimization")
     @PostMapping
@@ -47,5 +50,12 @@ public class EdaJobController {
                 .map(JobResponse::from)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(jobs);
+    }
+
+    @Operation(summary = "Check ORFS configuration", description = "Check if OpenROAD Flow Scripts is properly configured")
+    @GetMapping("/orfs/config")
+    public ResponseEntity<Map<String, Object>> getOrfsConfig() {
+        Map<String, Object> config = orfsExecutorService.getConfiguration();
+        return ResponseEntity.ok(config);
     }
 }

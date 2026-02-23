@@ -19,13 +19,16 @@ public class EdaJobService {
     private final EdaJobRepository edaJobRepository;
     private final OpenRoadService openRoadService;
     private final OptimizationService optimizationService;
+    private EdaJobService self; // 自注入，用于调用 @Async 方法
 
     public EdaJobService(EdaJobRepository edaJobRepository,
                          OpenRoadService openRoadService,
-                         @Lazy OptimizationService optimizationService) {
+                         @Lazy OptimizationService optimizationService,
+                         @Lazy EdaJobService self) {
         this.edaJobRepository = edaJobRepository;
         this.openRoadService = openRoadService;
         this.optimizationService = optimizationService;
+        this.self = self;
     }
 
     @Transactional
@@ -38,8 +41,8 @@ public class EdaJobService {
         EdaJob savedJob = edaJobRepository.save(job);
         log.info("Job submitted with ID: {}", savedJob.getId());
 
-        // 异步执行 OpenROAD 任务
-        executeJobAsync(savedJob.getId());
+        // 通过代理调用异步方法
+        self.executeJobAsync(savedJob.getId());
 
         return savedJob;
     }
@@ -58,8 +61,8 @@ public class EdaJobService {
         EdaJob savedJob = edaJobRepository.save(job);
         log.info("Job submitted with ID: {}, auto-optimize: {}", savedJob.getId(), autoOptimize);
 
-        // 异步执行 OpenROAD 任务
-        executeJobAsync(savedJob.getId());
+        // 通过代理调用异步方法
+        self.executeJobAsync(savedJob.getId());
 
         return savedJob;
     }

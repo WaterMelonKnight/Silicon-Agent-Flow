@@ -6,7 +6,7 @@ spring:
     allow-circular-references: true
 
   datasource:
-    url: jdbc:h2:mem:edadb
+    url: jdbc:h2:mem:silicondb
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -41,29 +41,42 @@ openroad:
   timeout:
     minutes: 30
 
+# EDA OpenROAD Flow Scripts 配置
+eda:
+  orfs:
+    workspace: /workspace/OpenROAD-flow-scripts/flow  # ORFS flow 目录（包含 Makefile）
+    docker:
+      image: openroad/orfs:latest
+      enabled: true
+    timeout:
+      minutes: 60
+    default-design: designs/sky130hd/gcd/config.mk
+
 # AI 优化配置
 ai:
   optimization:
     enabled: true
     max-iterations: 10  # 最大优化迭代次数
-    model: gpt-4  # 或使用 deepseek-chat
+    model: deepseek-chat  # DeepSeek 模型
   openai:
     api-key: ${OPENAI_API_KEY:sk-your-api-key}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}  # 可替换为 DeepSeek 或本地 API
 
----
-spring:
-  config:
-    activate:
-      on-profile: mysql
-
-  datasource:
-    url: jdbc:mysql://mysql:3306/edadb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
-    password: rootpassword
-
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
+# MySQL 配置已移除，项目现在使用 H2 内存数据库
+# 如需恢复 MySQL，请取消下面的注释并使用 --spring.profiles.active=mysql 启动
+#---
+#spring:
+#  config:
+#    activate:
+#      on-profile: mysql
+#
+#  datasource:
+#    url: jdbc:mysql://mysql:3306/edadb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#    username: root
+#    password: rootpassword
+#
+#  jpa:
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQLDialect

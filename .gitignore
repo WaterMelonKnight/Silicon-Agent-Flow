@@ -46,3 +46,84 @@ ENV/
 
 ### Docker ###
 *.log
+
+### Logs ###
+logs/
+log/
+spring-boot-*.log
+
+### OS ###
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+### Temporary files ###
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*.pid
+*.seed
+*.pid.lock
+
+### Database ###
+*.db
+*.sqlite
+*.sqlite3
+
+### Maven ###
+.mvn/
+mvnw
+mvnw.cmd
+
+### Archives ###
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+### EDA specific ###
+*.def
+*.lef
+*.gds
+*.oas
+*.spef
+*.sdf
+results/
+reports/
+work/
+
+### Job files and outputs ###
+job-*/
+output/
+
+### Sensitive data ###
+*.key
+*.pem
+*.crt
+*.p12
+credentials.json
+secrets.yaml
+
+### Coverage reports ###
+coverage/
+*.lcov
+.nyc_output/
+
+### Test results ###
+test-results/
+junit/
+
+### Node modules (if frontend build tools added) ###
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock

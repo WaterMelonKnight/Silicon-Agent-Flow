@@ -73,44 +73,32 @@ public class OptimizationService {
             """;
 
     /**
-     * User Prompt 模板
+     * User Prompt 模板 - 使用 $variable$ 语法避免与 JSON 花括号冲突
      */
     private static final String USER_PROMPT_TEMPLATE = """
             ## 当前设计参数
-            ```json
-            {parameters}
-            ```
+            $parameters$
 
             ## 执行结果
-            {results}
+            $results$
 
             ## 日志摘要
-            ```
-            {logSummary}
-            ```
+            $logSummary$
 
             ## 错误信息
-            {errorInfo}
+            $errorInfo$
 
             ## 优化目标
-            当前迭代次数：{iteration}/{maxIterations}
-            主要目标：{optimizationGoal}
+            当前迭代次数：$iteration$/$maxIterations$
+            主要目标：$optimizationGoal$
 
             请分析上述结果，找出性能瓶颈，并给出一组新的、更优的参数建议。
 
-            **返回格式**（必须是有效的 JSON）：
-            ```json
-            {
-              "design_name": "优化后的设计名称",
-              "technology": "保持不变",
-              "utilization": 新的利用率值,
-              "aspect_ratio": 新的长宽比,
-              "core_margin": 新的边距,
-              "target_frequency": 新的目标频率,
-              "power_budget": 新的功耗预算,
-              "optimization_reason": "简短说明为什么这样调整（中文，50字以内）"
-            }
-            ```
+            返回格式要求：必须是有效的 JSON，包含以下字段：
+            - CORE_UTILIZATION: 新的核心利用率 (40-90)
+            - PLACE_DENSITY: 新的布局密度 (0.4-0.9)
+            - CORE_ASPECT_RATIO: 新的长宽比 (0.5-2.0)
+            - optimization_reason: 简短说明调整理由（中文，50字以内）
             """;
 
     /**
