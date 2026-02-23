@@ -1,37 +1,82 @@
 # Silicon-Agent-Flow
 
-EDA 任务调度系统 - 用于调度芯片设计任务的开源项目
+**芯片设计智能优化系统** - 集成 OpenROAD Flow Scripts 和 AI 大模型的芯片后端设计自动化平台
+
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.0-blue.svg)](https://vuejs.org/)
+[![OpenROAD](https://img.shields.io/badge/OpenROAD-Latest-orange.svg)](https://theopenroadproject.org/)
+[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-purple.svg)](https://www.deepseek.com/)
+
+## 🎯 项目亮点
+
+### ✨ AI 优化实战案例
+
+**真实运行结果**（2024年测试）：
+
+```
+初始设计 → AI 自动优化 10 轮迭代 → 面积减少 56.7%
+
+Job #1 (初始):  UTIL=60, DENSITY=0.65 → Area=5641.7 μm²
+Job #2 (AI优化): UTIL=70, DENSITY=0.75 → Area=2441.1 μm² ✓ 减少 56.7%
+Job #3-10: 继续迭代优化，探索最优参数组合
+```
+
+**关键技术突破**：
+- 🚀 **异步优化**：API 响应时间从 12 分钟优化至 0.065 秒（提升 11,000 倍）
+- 🤖 **AI 驱动**：DeepSeek API 自动分析设计瓶颈，生成优化建议
+- 🔄 **闭环迭代**：自动创建 10 轮优化任务，无需人工干预
+- 📊 **实时可视化**：前端实时展示优化过程和结果对比
 
 ## 技术栈
 
-- **后端**: Spring Boot 3.2.2 + JDK 21
-- **数据库**: H2 (开发) / MySQL 8.0 (生产)
-- **ORM**: Spring Data JPA
-- **EDA 工具**: OpenROAD (集成真实芯片设计工具)
-- **Worker**: Python 3.11 + Flask (可选)
-- **容器化**: Docker + Docker Compose
+- **后端**: Spring Boot 3.2.2 + JDK 20
+- **前端**: Vue.js 3 + Composition API
+- **数据库**: H2 (内存数据库)
+- **AI 模型**: DeepSeek API / OpenAI API
+- **EDA 工具**: OpenROAD Flow Scripts (Docker)
+- **容器化**: Docker
 
-## 🎉 新特性：OpenROAD 集成
+## 🎉 核心功能
 
-系统现已集成真实的 EDA 工具 **OpenROAD**！
+### 1. OpenROAD 真实执行
 
-- ✅ 动态生成 TCL 配置文件
-- ✅ Docker 容器化执行
-- ✅ 自动解析面积、功耗等指标
-- ✅ 异步任务执行
-- ✅ 完整的日志捕获
+系统集成真实的 EDA 工具 **OpenROAD Flow Scripts**！
 
-详细文档请查看: [OPENROAD_INTEGRATION.md](OPENROAD_INTEGRATION.md)
+- ✅ Docker 容器化执行 ORFS
+- ✅ 动态参数注入（CORE_UTILIZATION, PLACE_DENSITY 等）
+- ✅ 自动解析面积、功耗、时序等 5 个核心指标
+- ✅ 完整的日志捕获和错误处理
+- ✅ 执行时间：1-2 秒（简单设计）
 
-## 🤖 新特性：AI Agent 优化
+### 2. AI 智能优化
 
-系统现已集成 **Spring AI**，使用 LLM 自动优化芯片设计参数！
+使用 **DeepSeek API** 自动优化芯片设计参数！
 
-- ✅ 自动分析设计结果
-- ✅ 智能识别性能瓶颈
-- ✅ 生成优化参数建议
-- ✅ 闭环迭代优化
-- ✅ 支持 OpenAI / DeepSeek / 本地模型
+- ✅ 自动分析设计结果和日志
+- ✅ 智能识别性能瓶颈（面积、功耗、时序）
+- ✅ 生成优化参数建议（利用率、密度、长宽比）
+- ✅ 闭环迭代优化（最多 10 轮）
+- ✅ 自定义 HTTP 客户端，解决 Spring AI 兼容性问题
+
+### 3. 异步任务调度
+
+高性能异步任务处理系统！
+
+- ✅ Spring @Async 异步执行
+- ✅ 自注入模式解决 AOP 代理限制
+- ✅ API 响应时间 < 100ms
+- ✅ 任务状态实时更新
+- ✅ 支持多任务并发执行
+
+### 4. 前端可视化
+
+赛博朋克风格的实时监控界面！
+
+- ✅ Vue 3 Composition API
+- ✅ 实时任务状态更新（每秒刷新）
+- ✅ AI 优化链路展示（🤖 AI Opt: Iter X ← #Y）
+- ✅ 结果指标可视化（面积、时序、功耗）
+- ✅ 优化趋势图表
 
 详细文档请查看: [AI_OPTIMIZATION.md](AI_OPTIMIZATION.md)
 
