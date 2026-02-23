@@ -6,9 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.silicon.agentflow.entity.EdaJob;
 import com.silicon.agentflow.repository.EdaJobRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
@@ -26,7 +23,7 @@ import java.util.Optional;
 @Service
 public class OptimizationService {
 
-    private final ChatClient chatClient;
+    private final DeepSeekClient deepSeekClient;
     private final EdaJobRepository edaJobRepository;
     private final EdaJobService edaJobService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -37,10 +34,10 @@ public class OptimizationService {
     @Value("${ai.optimization.max-iterations:10}")
     private int maxIterations;
 
-    public OptimizationService(ChatClient chatClient,
+    public OptimizationService(DeepSeekClient deepSeekClient,
                                EdaJobRepository edaJobRepository,
                                @Lazy EdaJobService edaJobService) {
-        this.chatClient = chatClient;
+        this.deepSeekClient = deepSeekClient;
         this.edaJobRepository = edaJobRepository;
         this.edaJobService = edaJobService;
     }
@@ -187,28 +184,21 @@ public class OptimizationService {
             String errorInfo = job.getErrorMessage() != null ? job.getErrorMessage() : "无错误";
             String optimizationGoal = determineOptimizationGoal(job.getResultMetrics());
 
-            // 构建 Prompt
-            Map<String, Object> promptVariables = new HashMap<>();
-            promptVariables.put("parameters", parametersJson);
-            promptVariables.put("results", resultsJson);
-            promptVariables.put("logSummary", logSummary);
-            promptVariables.put("errorInfo", errorInfo);
-            promptVariables.put("iteration", job.getOptimizationIteration() + 1);
-            promptVariables.put("maxIterations", maxIterations);
-            promptVariables.put("optimizationGoal", optimizationGoal);
+            // 构建用户提示词（替换模板变量）
+            String userPrompt = USER_PROMPT_TEMPLATE
+                    .replace("$parameters$", parametersJson)
+                    .replace("$results$", resultsJson)
+                    .replace("$logSummary$", logSummary)
+                    .replace("$errorInfo$", errorInfo)
+                    .replace("$iteration$", String.valueOf(job.getOptimizationIteration() + 1))
+                    .replace("$maxIterations$", String.valueOf(maxIterations))
+                    .replace("$optimizationGoal$", optimizationGoal);
 
-            PromptTemplate promptTemplate = new PromptTemplate(USER_PROMPT_TEMPLATE);
-            Prompt prompt = promptTemplate.create(promptVariables);
+            // 调用 DeepSeek API
+            log.debug("Calling DeepSeek API for optimization suggestion...");
+            String response = deepSeekClient.chatCompletion(SYSTEM_PROMPT, userPrompt);
 
-            // 调用 LLM
-            log.debug("Calling LLM for optimization suggestion...");
-            String response = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user(prompt.getContents())
-                    .call()
-                    .content();
-
-            log.debug("LLM response: {}", response);
+            log.debug("DeepSeek API response: {}", response);
 
             // 解析 JSON 响应
             return parseJsonResponse(response);
