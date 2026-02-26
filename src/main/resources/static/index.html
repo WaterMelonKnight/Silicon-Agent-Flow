@@ -276,8 +276,17 @@
                     </div>
                 </div>
 
-                <!-- Parameter Form -->
+                <!-- Mode Selection -->
                 <div class="form-group">
+                    <label class="form-label">DESIGN MODE</label>
+                    <select class="form-input" v-model="designMode" @change="onModeChange">
+                        <option value="builtin">Built-in Examples</option>
+                        <option value="upload">Upload Custom Design</option>
+                    </select>
+                </div>
+
+                <!-- Built-in Design Selection -->
+                <div v-if="designMode === 'builtin'" class="form-group">
                     <label class="form-label">DESIGN CONFIG</label>
                     <select class="form-input" v-model="params.design_config">
                         <option value="designs/sky130hd/gcd/config.mk">GCD (Greatest Common Divisor)</option>
@@ -287,19 +296,49 @@
                     </select>
                 </div>
 
+                <!-- Custom Design Upload -->
+                <div v-if="designMode === 'upload'" style="background: #1a1a2e; padding: 15px; border: 1px solid #ff00ff; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label class="form-label">📁 VERILOG FILE (.v) *</label>
+                        <input type="file" class="form-input" @change="onVerilogFileChange" accept=".v" style="padding: 5px;">
+                        <div v-if="verilogFile" style="font-size: 10px; color: #00ff00; margin-top: 5px;">
+                            ✓ {{ verilogFile.name }} ({{ (verilogFile.size / 1024).toFixed(1) }} KB)
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">📁 SDC FILE (.sdc) - Optional</label>
+                        <input type="file" class="form-input" @change="onSdcFileChange" accept=".sdc" style="padding: 5px;">
+                        <div v-if="sdcFile" style="font-size: 10px; color: #00ff00; margin-top: 5px;">
+                            ✓ {{ sdcFile.name }} ({{ (sdcFile.size / 1024).toFixed(1) }} KB)
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DESIGN NAME</label>
+                        <input type="text" class="form-input" v-model="customParams.design_name" placeholder="my_design">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">PLATFORM</label>
+                        <select class="form-input" v-model="customParams.platform">
+                            <option value="sky130hd">Sky130 HD</option>
+                            <option value="sky130hs">Sky130 HS</option>
+                            <option value="asap7">ASAP7</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">CORE UTILIZATION (%)</label>
-                    <input type="number" class="form-input" v-model.number="params.CORE_UTILIZATION" step="5" min="10" max="90">
+                    <input type="number" class="form-input" v-model.number="designMode === 'builtin' ? params.CORE_UTILIZATION : customParams.CORE_UTILIZATION" step="5" min="10" max="90">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">PLACE DENSITY</label>
-                    <input type="number" class="form-input" v-model.number="params.PLACE_DENSITY" step="0.05" min="0.1" max="1.0">
+                    <input type="number" class="form-input" v-model.number="designMode === 'builtin' ? params.PLACE_DENSITY : customParams.PLACE_DENSITY" step="0.05" min="0.1" max="1.0">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">CORE ASPECT RATIO</label>
-                    <input type="number" class="form-input" v-model.number="params.CORE_ASPECT_RATIO" step="0.1" min="0.5" max="2.0">
+                    <input type="number" class="form-input" v-model.number="designMode === 'builtin' ? params.CORE_ASPECT_RATIO : customParams.CORE_ASPECT_RATIO" step="0.1" min="0.5" max="2.0">
                 </div>
 
                 <div class="form-group" style="margin-top: 20px;">
@@ -398,12 +437,22 @@
             data() {
                 return {
                     currentTime: '',
+                    designMode: 'builtin',
                     params: {
                         design_config: 'designs/sky130hd/gcd/config.mk',
                         CORE_UTILIZATION: 65,
                         PLACE_DENSITY: 0.70,
                         CORE_ASPECT_RATIO: 1.0
                     },
+                    customParams: {
+                        design_name: 'custom_design',
+                        platform: 'sky130hd',
+                        CORE_UTILIZATION: 60,
+                        PLACE_DENSITY: 0.65,
+                        CORE_ASPECT_RATIO: 1.0
+                    },
+                    verilogFile: null,
+                    sdcFile: null,
                     autoOptimize: false,
                     submitting: false,
                     jobs: [],
@@ -445,7 +494,37 @@
                     this.currentTime = now.toLocaleTimeString('en-US', { hour12: false });
                 },
 
+                onModeChange() {
+                    this.verilogFile = null;
+                    this.sdcFile = null;
+                    this.addLog(`Switched to ${this.designMode} mode`, 'terminal-line');
+                },
+
+                onVerilogFileChange(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.verilogFile = file;
+                        this.addLog(`Verilog file selected: ${file.name}`, 'terminal-success');
+                    }
+                },
+
+                onSdcFileChange(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.sdcFile = file;
+                        this.addLog(`SDC file selected: ${file.name}`, 'terminal-success');
+                    }
+                },
+
                 async submitJob() {
+                    if (this.designMode === 'upload') {
+                        await this.submitUploadJob();
+                    } else {
+                        await this.submitBuiltinJob();
+                    }
+                },
+
+                async submitBuiltinJob() {
                     this.submitting = true;
                     const designName = this.params.design_config.split('/').pop().replace('.mk', '');
                     this.addLog(`Launching ORFS mission: ${designName}`, 'terminal-line');
@@ -465,6 +544,47 @@
                         const job = await response.json();
                         this.addLog(`✓ Mission #${job.id} launched successfully`, 'terminal-success');
                         this.addLog(`Design: ${designName}, Status: ${job.status}`, 'terminal-line');
+                        this.fetchJobs();
+                    } catch (error) {
+                        this.addLog(`✗ ERROR: ${error.message}`, 'terminal-error');
+                    } finally {
+                        this.submitting = false;
+                    }
+                },
+
+                async submitUploadJob() {
+                    if (!this.verilogFile) {
+                        this.addLog('✗ ERROR: Verilog file is required', 'terminal-error');
+                        return;
+                    }
+
+                    this.submitting = true;
+                    this.addLog(`Uploading custom design: ${this.verilogFile.name}`, 'terminal-line');
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('verilogFile', this.verilogFile);
+                        if (this.sdcFile) {
+                            formData.append('sdcFile', this.sdcFile);
+                        }
+
+                        // Merge custom params with optimization params
+                        const parameters = {
+                            ...this.customParams,
+                            autoOptimize: this.autoOptimize
+                        };
+                        formData.append('parameters', JSON.stringify(parameters));
+
+                        const response = await fetch('/api/jobs/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) throw new Error('Upload failed');
+
+                        const job = await response.json();
+                        this.addLog(`✓ Custom design uploaded successfully`, 'terminal-success');
+                        this.addLog(`✓ Mission #${job.id} launched`, 'terminal-success');
                         this.fetchJobs();
                     } catch (error) {
                         this.addLog(`✗ ERROR: ${error.message}`, 'terminal-error');
