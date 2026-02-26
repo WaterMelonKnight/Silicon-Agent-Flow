@@ -239,6 +239,81 @@
         ::-webkit-scrollbar-track { background: #0a0e27; }
         ::-webkit-scrollbar-thumb { background: #00ffff; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #ff00ff; }
+
+        /* Optimization Results Dashboard */
+        .optimization-results {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid #00ffff;
+            padding: 15px;
+            text-align: center;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .metric-baseline {
+            font-size: 20px;
+            color: #ff6666;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .metric-arrow {
+            font-size: 16px;
+            color: #00ffff;
+            margin: 5px 0;
+        }
+
+        .metric-optimized {
+            font-size: 24px;
+            color: #00ff00;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .metric-improvement {
+            font-size: 14px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .improvement-good {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+        }
+
+        .improvement-bad {
+            background: rgba(255, 102, 102, 0.2);
+            color: #ff6666;
+        }
+
+        .improvement-neutral {
+            background: rgba(136, 136, 136, 0.2);
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -420,6 +495,72 @@
                     <div id="optimizationChart"></div>
                 </div>
 
+                <!-- Optimization Results Dashboard (只在 AI 优化完成后显示) -->
+                <div v-if="showOptimizationResults" class="optimization-results" style="background: #0f1419; border: 2px solid #00ff00; padding: 20px; margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <span class="neon-cyan" style="font-size: 16px;">🎯 OPTIMIZATION RESULTS</span>
+                        <span style="color: #00ff00; font-size: 12px; margin-left: 15px;">
+                            ✓ AI Optimization Completed
+                        </span>
+                    </div>
+
+                    <!-- Before vs After 对比卡片 -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                        <!-- Area 面积 -->
+                        <div class="metric-card">
+                            <div class="metric-label">AREA (μm²)</div>
+                            <div class="metric-baseline">{{ formatNumber(baseline.area_um2) }}</div>
+                            <div class="metric-arrow">↓</div>
+                            <div class="metric-optimized">{{ formatNumber(bestResult.area_um2) }}</div>
+                            <div class="metric-improvement" :class="getImprovementClass(baseline.area_um2, bestResult.area_um2, true)">
+                                {{ calculateImprovement(baseline.area_um2, bestResult.area_um2, true) }}
+                            </div>
+                        </div>
+
+                        <!-- Power 功耗 -->
+                        <div class="metric-card">
+                            <div class="metric-label">POWER (mW)</div>
+                            <div class="metric-baseline">{{ formatNumber(baseline.power_mw) }}</div>
+                            <div class="metric-arrow">↓</div>
+                            <div class="metric-optimized">{{ formatNumber(bestResult.power_mw) }}</div>
+                            <div class="metric-improvement" :class="getImprovementClass(baseline.power_mw, bestResult.power_mw, true)">
+                                {{ calculateImprovement(baseline.power_mw, bestResult.power_mw, true) }}
+                            </div>
+                        </div>
+
+                        <!-- WNS 时序 -->
+                        <div class="metric-card">
+                            <div class="metric-label">WNS (ns)</div>
+                            <div class="metric-baseline">{{ formatNumber(baseline.wns_ns) }}</div>
+                            <div class="metric-arrow">↑</div>
+                            <div class="metric-optimized">{{ formatNumber(bestResult.wns_ns) }}</div>
+                            <div class="metric-improvement" :class="getImprovementClass(baseline.wns_ns, bestResult.wns_ns, false)">
+                                {{ calculateImprovement(baseline.wns_ns, bestResult.wns_ns, false) }}
+                            </div>
+                        </div>
+
+                        <!-- DRC 违例 -->
+                        <div class="metric-card">
+                            <div class="metric-label">DRC VIOLATIONS</div>
+                            <div class="metric-baseline">{{ baseline.drc_violations || 0 }}</div>
+                            <div class="metric-arrow">↓</div>
+                            <div class="metric-optimized">{{ bestResult.drc_violations || 0 }}</div>
+                            <div class="metric-improvement" :class="getImprovementClass(baseline.drc_violations, bestResult.drc_violations, true)">
+                                {{ calculateImprovement(baseline.drc_violations, bestResult.drc_violations, true) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 优化摘要 -->
+                    <div style="background: #1a1a2e; padding: 10px; border-left: 3px solid #00ff00; font-size: 11px;">
+                        <span style="color: #00ffff;">📈 Optimization Summary:</span>
+                        <span style="color: #e0e0e0; margin-left: 10px;">
+                            Completed {{ optimizationIterations }} iterations in AI auto-optimization mode.
+                            Best result achieved at iteration #{{ bestIterationId }}.
+                        </span>
+                    </div>
+                </div>
+
                 <!-- Live Terminal -->
                 <div class="terminal" ref="terminal">
                     <div class="terminal-line" v-for="(log, index) in terminalLogs" :key="index" :class="log.type">
@@ -458,7 +599,13 @@
                     jobs: [],
                     terminalLogs: [],
                     chart: null,
-                    orfsConfig: null
+                    orfsConfig: null,
+                    // 优化结果数据
+                    showOptimizationResults: false,
+                    baseline: {},
+                    bestResult: {},
+                    optimizationIterations: 0,
+                    bestIterationId: 0
                 };
             },
             computed: {
@@ -616,6 +763,7 @@
                         if (response.ok) {
                             this.jobs = await response.json();
                             this.updateChart();
+                            this.analyzeOptimizationResults();
                         }
                     } catch (error) {
                         console.error('Failed to fetch jobs:', error);
@@ -734,6 +882,98 @@
                         hour: '2-digit',
                         minute: '2-digit'
                     });
+                },
+
+                // 分析优化结果
+                analyzeOptimizationResults() {
+                    // 找出所有 AI 优化任务组（有 parentJobId 或 autoOptimize=true 的任务）
+                    const aiJobs = this.jobs.filter(j => j.autoOptimize && j.status === 'COMPLETED' && j.resultMetrics);
+
+                    if (aiJobs.length === 0) {
+                        this.showOptimizationResults = false;
+                        return;
+                    }
+
+                    // 找出最近一组优化任务（通过 parentJobId 追溯到根任务）
+                    const latestOptimizationGroup = this.getLatestOptimizationGroup(aiJobs);
+
+                    if (latestOptimizationGroup.length < 2) {
+                        this.showOptimizationResults = false;
+                        return;
+                    }
+
+                    // Baseline: 第一次运行的结果
+                    this.baseline = latestOptimizationGroup[0].resultMetrics || {};
+
+                    // Best Result: 找出面积最小的结果
+                    let bestJob = latestOptimizationGroup[0];
+                    for (let job of latestOptimizationGroup) {
+                        if (job.resultMetrics && job.resultMetrics.area_um2 < (bestJob.resultMetrics?.area_um2 || Infinity)) {
+                            bestJob = job;
+                        }
+                    }
+
+                    this.bestResult = bestJob.resultMetrics || {};
+                    this.optimizationIterations = latestOptimizationGroup.length;
+                    this.bestIterationId = bestJob.id;
+                    this.showOptimizationResults = true;
+                },
+
+                // 获取最近一组优化任务
+                getLatestOptimizationGroup(aiJobs) {
+                    if (aiJobs.length === 0) return [];
+
+                    // 按 ID 降序排序，找到最新的任务
+                    const sortedJobs = [...aiJobs].sort((a, b) => b.id - a.id);
+                    const latestJob = sortedJobs[0];
+
+                    // 找出这个任务所属的优化组（通过 parentJobId 追溯）
+                    const group = [];
+                    let currentJob = latestJob;
+
+                    // 向上追溯到根任务
+                    while (currentJob) {
+                        group.unshift(currentJob);
+                        if (currentJob.parentJobId) {
+                            currentJob = this.jobs.find(j => j.id === currentJob.parentJobId);
+                        } else {
+                            break;
+                        }
+                    }
+
+                    return group;
+                },
+
+                // 格式化数字
+                formatNumber(value) {
+                    if (value === undefined || value === null) return 'N/A';
+                    if (typeof value === 'number') {
+                        return value.toFixed(2);
+                    }
+                    return value;
+                },
+
+                // 计算改进百分比
+                calculateImprovement(baseline, optimized, lowerIsBetter = true) {
+                    if (!baseline || !optimized || baseline === 0) return 'N/A';
+
+                    const improvement = ((baseline - optimized) / baseline) * 100;
+                    const sign = improvement > 0 ? (lowerIsBetter ? '↓' : '↑') : (lowerIsBetter ? '↑' : '↓');
+
+                    return `${sign} ${Math.abs(improvement).toFixed(1)}%`;
+                },
+
+                // 获取改进样式类
+                getImprovementClass(baseline, optimized, lowerIsBetter = true) {
+                    if (!baseline || !optimized) return 'improvement-neutral';
+
+                    const improvement = baseline - optimized;
+
+                    if (lowerIsBetter) {
+                        return improvement > 0 ? 'improvement-good' : (improvement < 0 ? 'improvement-bad' : 'improvement-neutral');
+                    } else {
+                        return improvement < 0 ? 'improvement-good' : (improvement > 0 ? 'improvement-bad' : 'improvement-neutral');
+                    }
                 }
             }
         }).mount('#app');

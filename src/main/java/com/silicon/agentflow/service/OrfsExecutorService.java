@@ -333,7 +333,7 @@ public class OrfsExecutorService {
 
     /**
      * 解析 OpenROAD Flow Scripts 日志中的指标
-     * 提取面积、功耗等关键指标
+     * 提取面积、功耗、时序、DRC 违例等关键指标
      */
     private Map<String, Object> parseOrfsMetrics(String logContent) {
         Map<String, Object> metrics = new HashMap<>();
@@ -344,29 +344,36 @@ public class OrfsExecutorService {
         }
 
         try {
-            // 正则表达式：匹配面积指标
-            // 示例: "Design area 123.45 um^2" 或 "Total area: 123.45"
+            // 1. 面积指标 (Area)
+            // 匹配: "Design area 123.45 um^2", "Total area: 123.45", "chip area = 1234.56"
             Pattern areaPattern = Pattern.compile(
-                "(?:Design|Total|Core)?\\s*[Aa]rea\\s*[:=]?\\s*([0-9]+\\.?[0-9]*)\\s*(?:um\\^?2|µm²)?",
+                "(?:Design|Total|Core|Chip)?\\s*[Aa]rea\\s*[:=]?\\s*([0-9]+\\.?[0-9]*(?:[eE][+-]?[0-9]+)?)\\s*(?:um\\^?2|µm²|um2)?",
                 Pattern.CASE_INSENSITIVE
             );
 
-            // 正则表达式：匹配功耗指标
-            // 示例: "Total power: 1.234 mW" 或 "Power = 0.056 W"
+            // 2. 功耗指标 (Power)
+            // 匹配: "Total power: 1.234 mW", "Total power : 6.63e-03 W", "Power = 0.056 W"
             Pattern powerPattern = Pattern.compile(
-                "(?:Total|Internal|Switching|Leakage)?\\s*[Pp]ower\\s*[:=]?\\s*([0-9]+\\.?[0-9]*)\\s*([mµ]?W)?",
+                "Total\\s+power\\s*[:=]?\\s*([0-9]+\\.?[0-9]*(?:[eE][+-]?[0-9]+)?)\\s*([mµnp]?W)",
                 Pattern.CASE_INSENSITIVE
             );
 
-            // 正则表达式：匹配时序指标
-            // 示例: "slack (MET)" 或 "WNS: 0.123 ns"
-            Pattern slackPattern = Pattern.compile(
-                "(?:WNS|slack)\\s*[:=]?\\s*([\\-0-9]+\\.?[0-9]*)\\s*(?:ns)?",
+            // 3. 时序指标 (WNS - Worst Negative Slack)
+            // 匹配: "worst slack -2.07e-09", "Clock core_clock slack -2.376", "WNS: 0.123 ns"
+            Pattern wnsPattern = Pattern.compile(
+                "(?:worst\\s+slack|Clock\\s+\\w+\\s+slack|WNS|Worst\\s+Negative\\s+Slack)\\s*[:=]?\\s*([\\-0-9]+\\.?[0-9]*(?:[eE][+-]?[0-9]+)?)",
                 Pattern.CASE_INSENSITIVE
             );
 
-            // 正则表达式：匹配利用率
-            // 示例: "Core utilization: 65.5%"
+            // 4. DRC 违例数 (DRC Violations)
+            // 匹配: "Completing 100% with 73 violations", "Violations: 123", "Found 0 violations"
+            Pattern drcPattern = Pattern.compile(
+                "(?:Completing\\s+100%\\s+with|Found)\\s+([0-9]+)\\s+(?:antenna\\s+)?violations?|[Vv]iolations?\\s*[:=]?\\s*([0-9]+)",
+                Pattern.CASE_INSENSITIVE
+            );
+
+            // 5. 利用率 (Utilization)
+            // 匹配: "Core utilization: 65.5%"
             Pattern utilizationPattern = Pattern.compile(
                 "(?:Core)?\\s*[Uu]tilization\\s*[:=]?\\s*([0-9]+\\.?[0-9]*)\\s*%?",
                 Pattern.CASE_INSENSITIVE
@@ -390,12 +397,19 @@ public class OrfsExecutorService {
                 try {
                     double power = Double.parseDouble(powerMatcher.group(1));
                     String unit = powerMatcher.group(2);
-                    
+
                     // 统一转换为 mW
-                    if (unit != null && unit.toLowerCase().contains("w") && !unit.toLowerCase().contains("m")) {
-                        power = power * 1000; // W to mW
+                    if (unit != null) {
+                        String unitLower = unit.toLowerCase();
+                        if (unitLower.contains("w") && !unitLower.contains("m")) {
+                            power = power * 1000; // W to mW
+                        } else if (unitLower.contains("µw") || unitLower.contains("uw")) {
+                            power = power / 1000; // µW to mW
+                        } else if (unitLower.contains("nw")) {
+                            power = power / 1000000; // nW to mW
+                        }
                     }
-                    
+
                     metrics.put("power_mw", power);
                     log.info("Extracted power: {} mW", power);
                 } catch (NumberFormatException e) {
@@ -403,16 +417,36 @@ public class OrfsExecutorService {
                 }
             }
 
-            // 提取时序裕量 (slack)
-            Matcher slackMatcher = slackPattern.matcher(logContent);
-            if (slackMatcher.find()) {
+            // 提取 WNS (Worst Negative Slack)
+            Matcher wnsMatcher = wnsPattern.matcher(logContent);
+            if (wnsMatcher.find()) {
                 try {
-                    double slack = Double.parseDouble(slackMatcher.group(1));
-                    metrics.put("slack_ns", slack);
-                    metrics.put("timing_met", slack >= 0);
-                    log.info("Extracted slack: {} ns (timing {})", slack, slack >= 0 ? "MET" : "VIOLATED");
+                    double wns = Double.parseDouble(wnsMatcher.group(1));
+                    metrics.put("wns_ns", wns);
+                    metrics.put("timing_met", wns >= 0);
+                    log.info("Extracted WNS: {} ns (timing {})", wns, wns >= 0 ? "MET" : "VIOLATED");
                 } catch (NumberFormatException e) {
-                    log.warn("Failed to parse slack value: {}", slackMatcher.group(1));
+                    log.warn("Failed to parse WNS value: {}", wnsMatcher.group(1));
+                }
+            }
+
+            // 提取 DRC 违例数
+            Matcher drcMatcher = drcPattern.matcher(logContent);
+            if (drcMatcher.find()) {
+                try {
+                    // 尝试第一个捕获组（Completing 100% with X violations）
+                    String violationsStr = drcMatcher.group(1);
+                    if (violationsStr == null) {
+                        // 如果第一个组为空，尝试第二个组（Violations: X）
+                        violationsStr = drcMatcher.group(2);
+                    }
+                    if (violationsStr != null) {
+                        int violations = Integer.parseInt(violationsStr);
+                        metrics.put("drc_violations", violations);
+                        log.info("Extracted DRC violations: {}", violations);
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("Failed to parse DRC violations");
                 }
             }
 
