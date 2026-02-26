@@ -197,24 +197,56 @@ public class OrfsExecutorService {
         command.add("run");
         command.add("--rm");
 
-        // 挂载 OpenROAD-flow-scripts/flow 目录
-        // 注意：orfsWorkspace 应该指向 flow 目录
-        command.add("-v");
-        command.add(orfsWorkspace + ":/OpenROAD-flow-scripts/flow");
+        // 检查是否为自定义设计（用户上传的文件）
+        boolean isCustomDesign = Boolean.TRUE.equals(parameters.get("custom_design"));
+        String workspacePath = (String) parameters.get("workspace_path");
 
-        // 设置工作目录为 flow
-        command.add("-w");
-        command.add("/OpenROAD-flow-scripts/flow");
+        if (isCustomDesign && workspacePath != null) {
+            // 自定义设计模式：挂载 ORFS 和自定义工作区
+            log.info("Using custom design mode with workspace: {}", workspacePath);
 
-        // 镜像名称
-        command.add(dockerImage);
+            // 挂载 OpenROAD-flow-scripts 根目录（不是 flow 子目录）
+            command.add("-v");
+            command.add(orfsWorkspace + ":/OpenROAD-flow-scripts/flow");
 
-        // 执行 make 命令
-        command.add("make");
+            // 挂载自定义工作区到容器内的 /workspace
+            command.add("-v");
+            Path absoluteWorkspace = Paths.get(workspacePath).toAbsolutePath();
+            command.add(absoluteWorkspace.toString() + ":/workspace");
 
-        // 获取设计配置
-        String designConfig = (String) parameters.getOrDefault("design_config", defaultDesign);
-        command.add("DESIGN_CONFIG=" + designConfig);
+            // 设置工作目录为 flow
+            command.add("-w");
+            command.add("/OpenROAD-flow-scripts/flow");
+
+            // 镜像名称
+            command.add(dockerImage);
+
+            // 执行 make 命令，指向容器内的自定义配置
+            command.add("make");
+            command.add("DESIGN_CONFIG=/workspace/config.mk");
+
+        } else {
+            // 内置示例模式：使用 ORFS 内置的设计
+            log.info("Using built-in design mode");
+
+            // 挂载 OpenROAD-flow-scripts/flow 目录
+            command.add("-v");
+            command.add(orfsWorkspace + ":/OpenROAD-flow-scripts/flow");
+
+            // 设置工作目录为 flow
+            command.add("-w");
+            command.add("/OpenROAD-flow-scripts/flow");
+
+            // 镜像名称
+            command.add(dockerImage);
+
+            // 执行 make 命令
+            command.add("make");
+
+            // 获取设计配置
+            String designConfig = (String) parameters.getOrDefault("design_config", defaultDesign);
+            command.add("DESIGN_CONFIG=" + designConfig);
+        }
 
         return command;
     }
